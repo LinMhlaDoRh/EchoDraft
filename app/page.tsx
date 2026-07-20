@@ -123,7 +123,7 @@ export default function Home() {
         </h1>
         <p className="text-secondary-text text-lg">
           Paste one pillar piece and get platform-ready drafts for LinkedIn, X, Instagram, YouTube,
-          and email — each checked for authenticity and easy to refine.
+          and email each checked for authenticity and easy to refine.
         </p>
       </div>
 

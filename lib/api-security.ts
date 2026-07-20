@@ -104,7 +104,7 @@ export async function authorizeApiRequest(
     };
   }
 
-  // 1) Explicit API token — bypass-proof for automation.
+  // 1) Explicit API token bypass-proof for automation.
   if (configuredToken && provided && timingSafeStringEqual(provided, configuredToken)) {
     return { ok: true, via: "token" };
   }

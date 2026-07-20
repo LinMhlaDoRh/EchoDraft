@@ -155,7 +155,7 @@ export function PlatformOutputCard({
             </ul>
           </details>
         )}
-        {/* Render as plain text only — never dangerouslySetInnerHTML. */}
+        {/* Render as plain text only never dangerouslySetInnerHTML. */}
         <p className="whitespace-pre-wrap leading-7">{content}</p>
       </div>
     </section>

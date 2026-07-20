@@ -3,21 +3,21 @@
 Turn one pillar piece into five platform-native drafts that still sound like you.
 
 EchoDraft learns your writing voice from a few samples, then repurposes any long-form
-content into ready-to-post drafts for **LinkedIn, X, Instagram, YouTube, and email** —
+content into ready-to-post drafts for **LinkedIn, X, Instagram, YouTube, and email**
 checking each one for authenticity and letting you refine individual drafts on demand.
 
 ## Features
 
-- **Voice profile** — paste 3–5 writing samples and EchoDraft extracts your tone,
+- **Voice profile** paste 3–5 writing samples and EchoDraft extracts your tone,
   vocabulary, sentence rhythm, and personal do’s and don’ts.
-- **Five platform drafts in one step** — a single request produces a LinkedIn post,
+- **Five platform drafts in one step** a single request produces a LinkedIn post,
   an X thread, an Instagram caption, a YouTube description, and an email newsletter,
   each written to that platform’s format.
-- **Authenticity check** — every draft gets a local authenticity score that flags
+- **Authenticity check** every draft gets a local authenticity score that flags
   generic, robotic phrasing. No network calls are needed for scoring.
-- **Refine one draft at a time** — open **Tweak** on any card (“make it punchier”,
+- **Refine one draft at a time** open **Tweak** on any card (“make it punchier”,
   “cut 20%”, “more casual”) and only that draft is regenerated.
-- **Copy or export** — copy a single draft, or export all five as a `.txt` file.
+- **Copy or export** copy a single draft, or export all five as a `.txt` file.
 
 ## Tech stack
 

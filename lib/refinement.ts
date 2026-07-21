@@ -1,4 +1,5 @@
 import type { VoiceProfile } from "./gemini";
+import { extractJsonFromText } from "./gemini";
 import {
   DEFAULT_GEMINI_MODEL,
   formatXThread,
@@ -131,10 +132,10 @@ export async function refinePlatformOutput(
               properties: { xThread: { type: "ARRAY", items: { type: "STRING" } } },
               required: ["xThread"],
             },
-            temperature: 0.65,
-            maxOutputTokens: 1800,
+            temperature: 0.55,
+            maxOutputTokens: 4096,
           }
-        : { temperature: 0.65, maxOutputTokens: 1800 },
+        : { temperature: 0.55, maxOutputTokens: 4096 },
     }),
   });
   if (!response.ok) {
@@ -147,17 +148,21 @@ export async function refinePlatformOutput(
     throw new Error("Refinement failed due to an upstream provider error. Please try again.");
   }
   const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  const candidate = data?.candidates?.[0];
+  const text = candidate?.content?.parts?.[0]?.text?.trim();
   if (!text) throw new Error("Gemini returned an empty refinement.");
+  if (candidate?.finishReason === "MAX_TOKENS" || candidate?.finishReason === "LENGTH") {
+    // Continue if the body is still usable; otherwise surface a clear retry message below.
+  }
   if (!isX) return { output: text, mode: "ai" };
   let tweets: unknown;
   try {
-    tweets = JSON.parse(text)?.xThread;
+    tweets = (extractJsonFromText(text) as { xThread?: unknown })?.xThread;
   } catch {
-    throw new Error("Gemini returned an invalid X thread.");
+    throw new Error("Gemini returned an invalid X thread. Please try once more.");
   }
   if (!Array.isArray(tweets) || tweets.length < 3) {
-    throw new Error("Gemini returned an invalid X thread.");
+    throw new Error("Gemini returned an invalid X thread. Please try once more.");
   }
   return {
     output: tweets.slice(0, 5).map((tweet: unknown) => String(tweet).slice(0, MAX_TWEET_CHARS)),

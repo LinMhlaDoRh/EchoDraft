@@ -26,19 +26,49 @@ Samples:
 ${samples.map((s, i) => `--- Sample ${i + 1} ---\n${s}`).join("\n\n")}`;
 }
 
+/**
+ * Parse model text into JSON, tolerating common Gemini quirks:
+ * markdown fences, leading/trailing prose, and mild truncation noise.
+ */
 export function extractJsonFromText(text: string): unknown {
-  // Try to find a JSON object inside the text if the model adds extra prose
-  const firstBrace = text.indexOf("{");
-  const lastBrace = text.lastIndexOf("}");
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // continue with brace extraction
+  }
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    const candidate = text.slice(firstBrace, lastBrace + 1);
+    const candidate = cleaned.slice(firstBrace, lastBrace + 1);
     try {
       return JSON.parse(candidate);
     } catch {
-      // fall through to raw parse
+      // continue
     }
   }
-  return JSON.parse(text);
+
+  // Last resort: strip trailing commas before } or ] (common model slip)
+  const noTrailingCommas = cleaned.replace(/,(\s*[}\]])/g, "$1");
+  if (noTrailingCommas !== cleaned) {
+    try {
+      return JSON.parse(noTrailingCommas);
+    } catch {
+      const first = noTrailingCommas.indexOf("{");
+      const last = noTrailingCommas.lastIndexOf("}");
+      if (first !== -1 && last !== -1 && last > first) {
+        return JSON.parse(noTrailingCommas.slice(first, last + 1));
+      }
+    }
+  }
+
+  throw new SyntaxError("Unable to parse JSON from model response");
 }
 
 export async function callGeminiForVoiceProfile(

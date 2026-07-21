@@ -1,5 +1,5 @@
 import type { VoiceProfile } from "./gemini";
-import { DEFAULT_VOICE_MODEL } from "./gemini";
+import { DEFAULT_VOICE_MODEL, extractJsonFromText } from "./gemini";
 
 /** Shared default model — single source of truth (re-export from gemini). */
 export const DEFAULT_GEMINI_MODEL = DEFAULT_VOICE_MODEL;
@@ -143,11 +143,12 @@ GLOBAL RULES
 - Return JSON only.
 
 PLATFORM RULES
-linkedin: 1,200–1,500 characters; strong hook; short paragraphs; professional but human; end with a question/CTA; max 3 hashtags.
+linkedin: about 900–1,200 characters; strong hook; short paragraphs; professional but human; end with a question/CTA; max 3 hashtags.
 xThread: array of 3–5 unnumbered tweet strings; each <=280 characters; strong first hook; final tweet has CTA/takeaway.
-instagram: 150–300 words; first-line hook; sparing relevant emoji; final line has 5–10 hashtags.
-youtube: 200–300 words; keyword-rich first paragraph; literal TIMESTAMPS and LINKS headings; placeholder timestamps; no invented URLs; end with CTA.
-newsletter: begins Subject:; 100–150 body words; personal opener; one clear CTA.
+instagram: about 120–220 words; first-line hook; sparing relevant emoji; final line has 5–10 hashtags.
+youtube: about 150–250 words; keyword-rich first paragraph; literal TIMESTAMPS and LINKS headings; placeholder timestamps; no invented URLs; end with CTA.
+newsletter: begins Subject:; about 80–130 body words; personal opener; one clear CTA.
+Keep each field complete but concise so the full JSON always fits.
 
 PILLAR CONTENT
 ${pillarText}`;
@@ -165,6 +166,54 @@ const responseSchema = {
   required: ["linkedin", "xThread", "instagram", "youtube", "newsletter"],
 };
 
+const GENERATION_MAX_OUTPUT_TOKENS = 8192;
+const GENERATION_MAX_ATTEMPTS = 2;
+
+function mapGeminiHttpError(status: number): Error {
+  if (status === 401 || status === 403) {
+    return new Error("Gemini authentication failed. Check the server-side API key and restrictions.");
+  }
+  if (status === 429) {
+    return new Error("Gemini rate limit reached. Wait briefly, then try again.");
+  }
+  if (status === 400) {
+    return new Error("Gemini rejected the request. Check GEMINI_MODEL and request format.");
+  }
+  return new Error("Generation failed due to an upstream provider error. Please try again.");
+}
+
+function parseGenerationPayload(data: unknown): unknown {
+  const candidate = (data as {
+    candidates?: Array<{
+      finishReason?: string;
+      content?: { parts?: Array<{ text?: string }> };
+    }>;
+  })?.candidates?.[0];
+
+  const raw = candidate?.content?.parts?.[0]?.text;
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  const finishReason = candidate?.finishReason;
+  if (finishReason === "MAX_TOKENS" || finishReason === "LENGTH") {
+    // Still try to parse; if truncated, parsing will fail and the caller can retry.
+    try {
+      return extractJsonFromText(raw);
+    } catch {
+      throw new Error(
+        "Gemini cut off the response before finishing all five drafts. Please try once more."
+      );
+    }
+  }
+
+  try {
+    return extractJsonFromText(raw);
+  } catch {
+    throw new Error("Gemini returned invalid JSON. Please try once more.");
+  }
+}
+
 export async function generateAllPlatformPosts(
   input: GenerateAllInput,
   apiKey: string | undefined,
@@ -176,42 +225,48 @@ export async function generateAllPlatformPosts(
     "https://generativelanguage.googleapis.com/v1beta/models/" +
     encodeURIComponent(safeModel) +
     ":generateContent";
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: buildAllPlatformsPrompt(input) }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.65,
-        maxOutputTokens: 5000,
-      },
-    }),
-  });
-  if (!response.ok) {
-    // Do not forward raw Gemini bodies to callers.
-    if (response.status === 401 || response.status === 403) {
-      throw new Error("Gemini authentication failed. Check the server-side API key and restrictions.");
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= GENERATION_MAX_ATTEMPTS; attempt++) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: buildAllPlatformsPrompt(input) }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema,
+          // Slightly lower temperature for more stable JSON structure.
+          temperature: attempt === 1 ? 0.55 : 0.35,
+          maxOutputTokens: GENERATION_MAX_OUTPUT_TOKENS,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw mapGeminiHttpError(response.status);
     }
-    if (response.status === 429) {
-      throw new Error("Gemini rate limit reached. Wait briefly, then try again.");
+
+    const data = await response.json();
+    try {
+      const parsed = parseGenerationPayload(data);
+      return { outputs: normalizePlatformOutputs(parsed), mode: "ai", model: safeModel };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Generation failed.");
+      const message = lastError.message;
+      const retryable =
+        message.includes("invalid JSON") ||
+        message.includes("cut off the response") ||
+        message.includes("empty response") ||
+        message.includes("missing");
+      if (!retryable || attempt === GENERATION_MAX_ATTEMPTS) {
+        throw lastError;
+      }
     }
-    if (response.status === 400) {
-      throw new Error("Gemini rejected the request. Check GEMINI_MODEL and request format.");
-    }
-    throw new Error("Generation failed due to an upstream provider error. Please try again.");
   }
-  const data = await response.json();
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (typeof raw !== "string" || !raw.trim()) throw new Error("Gemini returned an empty response.");
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Gemini returned invalid JSON. Please try once more.");
-  }
-  return { outputs: normalizePlatformOutputs(parsed), mode: "ai", model: safeModel };
+
+  throw lastError ?? new Error("Generation failed. Please try again.");
 }
 
 export function normalizePlatformOutputs(value: unknown): PlatformOutputs {

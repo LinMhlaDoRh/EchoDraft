@@ -1,7 +1,7 @@
 import type { VoiceProfile } from "./gemini";
 import { DEFAULT_VOICE_MODEL, extractJsonFromText } from "./gemini";
 
-/** Shared default model — single source of truth (re-export from gemini). */
+/** Shared default model single source of truth (re-export from gemini). */
 export const DEFAULT_GEMINI_MODEL = DEFAULT_VOICE_MODEL;
 export const MAX_PILLAR_CHARS = 12000;
 export const MAX_TWEET_CHARS = 280;

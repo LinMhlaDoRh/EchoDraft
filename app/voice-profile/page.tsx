@@ -163,7 +163,7 @@ export default function VoiceProfilePage() {
                 value={sample.text}
                 onChange={(e) => updateSample(sample.id, e.target.value)}
                 maxLength={MAX_CHARS}
-                placeholder="Paste a paragraph you’ve written — a post, email, or caption..."
+                placeholder="Paste a paragraph you’ve written a post, email, or caption..."
                 className="w-full min-h-[140px] p-4 rounded-lg bg-surface border border-border text-primary-text placeholder:text-secondary-text focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-transparent resize-y transition-shadow"
               />
             </div>

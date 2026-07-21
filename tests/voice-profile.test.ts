@@ -5,7 +5,7 @@ import {
 } from "../lib/gemini";
 
 const samples = [
-  "Hey friends — I’ve been thinking about how we all pretend to have it together online. The truth? Most of us are winging it. And that’s okay.",
+  "Hey friends I’ve been thinking about how we all pretend to have it together online. The truth? Most of us are winging it. And that’s okay.",
   "Three things I learned this week: 1) sleep is non-negotiable, 2) your audience can smell authenticity, and 3) done is better than perfect.",
   "Stop writing like you’re pitching a VC. Write like you’re explaining it to the person next to you at a coffee shop. That’s the post that actually connects.",
 ];

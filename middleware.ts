@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
   const nonce = createCspNonce();
   const csp = buildContentSecurityPolicy(nonce);
 
-  // Handle CORS preflight for API routes — only allow same-origin.
+  // Handle CORS preflight for API routes only allow same-origin.
   if (request.method === "OPTIONS" && request.nextUrl.pathname.startsWith("/api/")) {
     const origin = request.headers.get("origin");
     const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
   applySecurityHeaders(response, csp, prod);
 
   // Issue / refresh signed browser session on document navigations (not on API).
-  // Cookie is httpOnly + SameSite=strict — JS never sees secrets.
+  // Cookie is httpOnly + SameSite=strict JS never sees secrets.
   if (!request.nextUrl.pathname.startsWith("/api/")) {
     const secret = getSessionSecret();
     if (secret) {
